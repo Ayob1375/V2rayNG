@@ -193,7 +193,16 @@ fun MainScreen(
                     }
                 )
             },
-            bottomBar = {},
+            bottomBar = {
+                MainBottomBar(
+                    displayText = displayText,
+                    isRunning = isRunning,
+                    isDarkTheme = isDarkTheme,
+                    traffic = traffic,
+                    selectedPing = selectedPing,
+                    onAction = onAction
+                )
+            },
             floatingActionButton = {},
         ) { innerPadding ->
 
@@ -203,18 +212,6 @@ fun MainScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
-                    // Connection panel moved to the top (under the app bar):
-                    // visible at a glance without covering the server list,
-                    // and nothing overlaps the speed labels anymore.
-                    MainConnectionPanel(
-                        displayText = displayText,
-                        isRunning = isRunning,
-                        isDarkTheme = isDarkTheme,
-                        traffic = traffic,
-                        selectedPing = selectedPing,
-                        onAction = onAction
-                    )
-
                     if (groups.size > 1) {
                         GroupTabBar(
                             groups = groups,

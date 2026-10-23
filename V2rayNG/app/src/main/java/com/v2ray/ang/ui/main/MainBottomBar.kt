@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,16 +66,15 @@ private fun formatUptime(totalSeconds: Long): String {
 }
 
 /**
- * Compact connection panel shown directly under the top app bar, above the
- * group tabs. It carries the connect/stop button, live ping, download/upload
+ * Bottom status panel: the connect/stop button, live ping, download/upload
  * speeds, uptime and session traffic, plus quick actions (smart connect and
  * update all subscriptions).
  *
- * It replaces the old bottom bar whose floating FAB overlapped the upload
- * speed label; here everything is laid out inline so nothing is covered.
+ * Everything is laid out inline in a compact single card, so unlike the old
+ * floating FAB design nothing ever covers the speed labels.
  */
 @Composable
-fun MainConnectionPanel(
+fun MainBottomBar(
     displayText: String,
     isRunning: Boolean,
     isDarkTheme: Boolean,
@@ -107,6 +109,7 @@ fun MainConnectionPanel(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
+            .windowInsetsPadding(WindowInsets.navigationBars)
     ) {
         AppDivider()
 

@@ -43,11 +43,12 @@ object TrafficStatsMonitor {
 
     private var monitorJob: Job? = null
 
-    // Cumulative counters from the previous query round (core-side counters).
-    private var lastProxyUp = 0L
-    private var lastProxyDown = 0L
-
     // Session totals accumulated by this monitor.
+    // NOTE: the Go core resets every traffic counter on each query
+    // (counter.Set(0) returns the value accumulated since the previous
+    // query), so query results are already per-interval deltas - no
+    // baselines are kept here, which also stays correct across core
+    // reloads (network handovers) that restart the counters from zero.
     private var sessionUp = 0L
     private var sessionDown = 0L
 
@@ -100,17 +101,14 @@ object TrafficStatsMonitor {
                     continue
                 }
 
-                // Core counters reset when the core reloads; clamp negative deltas to zero.
-                val deltaUp = (proxyUp - lastProxyUp).coerceAtLeast(0L)
-                val deltaDown = (proxyDown - lastProxyDown).coerceAtLeast(0L)
-                lastProxyUp = proxyUp
-                lastProxyDown = proxyDown
-                sessionUp += deltaUp
-                sessionDown += deltaDown
+                // The payload values are the bytes transferred since the previous
+                // query (counters are reset on read), i.e. already the deltas.
+                sessionUp += proxyUp.coerceAtLeast(0L)
+                sessionDown += proxyDown.coerceAtLeast(0L)
 
                 _snapshot.value = Snapshot(
-                    proxyUpSpeed = (deltaUp / sinceLastQueryInSeconds).toLong(),
-                    proxyDownSpeed = (deltaDown / sinceLastQueryInSeconds).toLong(),
+                    proxyUpSpeed = (proxyUp / sinceLastQueryInSeconds).toLong(),
+                    proxyDownSpeed = (proxyDown / sinceLastQueryInSeconds).toLong(),
                     directUpSpeed = (directUp / sinceLastQueryInSeconds).toLong(),
                     directDownSpeed = (directDown / sinceLastQueryInSeconds).toLong(),
                     sessionUp = sessionUp,
@@ -136,8 +134,6 @@ object TrafficStatsMonitor {
     }
 
     private fun resetCounters() {
-        lastProxyUp = 0L
-        lastProxyDown = 0L
         sessionUp = 0L
         sessionDown = 0L
     }
