@@ -182,7 +182,7 @@ object CoreServiceManager {
             MessageHelper.sendMsg2UI(service, AppConfig.MSG_STATE_START_SUCCESS, "")
         }
         NotificationManager.startSpeedNotification()
-        TrafficStatsMonitor.start()
+        TrafficStatsMonitor.start(service)
         LogUtil.i(AppConfig.TAG, "StartCore-Manager: Core started successfully")
     }
 

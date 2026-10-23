@@ -119,8 +119,8 @@ class MainViewModel(
     private val _serviceStartRequest = Channel<Unit>(Channel.BUFFERED)
     val serviceStartRequest = _serviceStartRequest.receiveAsFlow()
 
-    /** Live traffic/speed snapshots published by the core service. */
-    val trafficStats: StateFlow<TrafficStatsMonitor.Snapshot> = TrafficStatsMonitor.snapshot
+    /** Live traffic/speed snapshots relayed from the ":daemon" process via broadcast. */
+    val trafficStats: StateFlow<TrafficStatsMonitor.Snapshot> = dataSource.trafficStats
 
     private val initialPageReady = CompletableDeferred<Unit>()
 

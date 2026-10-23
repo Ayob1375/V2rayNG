@@ -1,5 +1,7 @@
 package com.v2ray.ang.handler
 
+import android.content.Context
+import android.content.Intent
 import com.v2ray.ang.AppConfig
 import com.v2ray.ang.core.CoreServiceManager
 import com.v2ray.ang.util.LogUtil
@@ -19,6 +21,11 @@ import kotlinx.coroutines.launch
  *
  * The loop runs while the core is running, independent of the speed
  * notification preference, so the main screen always has fresh data.
+ *
+ * IMPORTANT: the core service runs in the ":daemon" process while the UI
+ * lives in the main process. A StateFlow updated here is invisible to the
+ * UI, so every snapshot is additionally broadcast to the UI process via
+ * [AppConfig.BROADCAST_ACTION_TRAFFIC_STATS] (same pattern as MSG_STATE_*).
  */
 object TrafficStatsMonitor {
 
@@ -43,6 +50,9 @@ object TrafficStatsMonitor {
 
     private var monitorJob: Job? = null
 
+    /** Application context of the daemon process, used for the UI broadcast. */
+    private var appContext: Context? = null
+
     // Session totals accumulated by this monitor.
     // NOTE: the Go core resets every traffic counter on each query
     // (counter.Set(0) returns the value accumulated since the previous
@@ -58,11 +68,14 @@ object TrafficStatsMonitor {
      * Starts monitoring. Called right after the core loop starts successfully.
      * Safe to call multiple times; the first call wins until [stop] is invoked.
      */
-    fun start() {
+    fun start(context: Context) {
         if (monitorJob?.isActive == true) return
+        appContext = context.applicationContext
         resetCounters()
         connectedAt = System.currentTimeMillis()
-        _snapshot.value = Snapshot(connectedAtMillis = connectedAt)
+        val initial = Snapshot(connectedAtMillis = connectedAt)
+        _snapshot.value = initial
+        broadcast(initial)
 
         monitorJob = CoroutineScope(Dispatchers.IO).launch {
             var lastQueryTime = System.currentTimeMillis()
@@ -106,7 +119,7 @@ object TrafficStatsMonitor {
                 sessionUp += proxyUp.coerceAtLeast(0L)
                 sessionDown += proxyDown.coerceAtLeast(0L)
 
-                _snapshot.value = Snapshot(
+                val snapshot = Snapshot(
                     proxyUpSpeed = (proxyUp / sinceLastQueryInSeconds).toLong(),
                     proxyDownSpeed = (proxyDown / sinceLastQueryInSeconds).toLong(),
                     directUpSpeed = (directUp / sinceLastQueryInSeconds).toLong(),
@@ -115,6 +128,8 @@ object TrafficStatsMonitor {
                     sessionDown = sessionDown,
                     connectedAtMillis = connectedAt,
                 )
+                _snapshot.value = snapshot
+                broadcast(snapshot)
             }
         }
         LogUtil.i(AppConfig.TAG, "TrafficStatsMonitor started")
@@ -129,8 +144,31 @@ object TrafficStatsMonitor {
         monitorJob = null
         resetCounters()
         connectedAt = 0L
-        _snapshot.value = Snapshot()
+        val cleared = Snapshot()
+        _snapshot.value = cleared
+        broadcast(cleared)
+        appContext = null
         LogUtil.i(AppConfig.TAG, "TrafficStatsMonitor stopped")
+    }
+
+    /** Sends the snapshot to the UI process (the monitor itself runs in ":daemon"). */
+    private fun broadcast(snapshot: Snapshot) {
+        val context = appContext ?: return
+        try {
+            val intent = Intent(AppConfig.BROADCAST_ACTION_TRAFFIC_STATS).apply {
+                `package` = context.packageName
+                putExtra("proxyUp", snapshot.proxyUpSpeed)
+                putExtra("proxyDown", snapshot.proxyDownSpeed)
+                putExtra("directUp", snapshot.directUpSpeed)
+                putExtra("directDown", snapshot.directDownSpeed)
+                putExtra("sessionUp", snapshot.sessionUp)
+                putExtra("sessionDown", snapshot.sessionDown)
+                putExtra("connectedAt", snapshot.connectedAtMillis)
+            }
+            context.sendBroadcast(intent)
+        } catch (e: Exception) {
+            LogUtil.e(AppConfig.TAG, "TrafficStatsMonitor: broadcast failed", e)
+        }
     }
 
     private fun resetCounters() {

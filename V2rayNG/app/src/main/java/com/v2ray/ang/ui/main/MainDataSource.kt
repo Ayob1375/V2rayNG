@@ -6,11 +6,19 @@ import com.v2ray.ang.dto.entities.ProfileItem
 import com.v2ray.ang.dto.entities.ServerAffiliationInfo
 import com.v2ray.ang.dto.entities.SubscriptionCache
 import com.v2ray.ang.dto.entities.SubscriptionItem
+import com.v2ray.ang.handler.TrafficStatsMonitor
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
 import java.io.Closeable
 
 interface MainDataSource : Closeable {
     val mainServiceEvent: Flow<MainServiceEvent>
+
+    /**
+     * Live traffic snapshots relayed from the ":daemon" process. The core
+     * service publishes these via [AppConfig.BROADCAST_ACTION_TRAFFIC_STATS].
+     */
+    val trafficStats: StateFlow<TrafficStatsMonitor.Snapshot>
 
     fun getSelectedSubscriptionId(): String
     fun setSelectedSubscriptionId(id: String)

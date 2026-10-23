@@ -22,11 +22,15 @@ import com.v2ray.ang.handler.AppLocaleManager
 import com.v2ray.ang.handler.MmkvManager
 import com.v2ray.ang.handler.SettingsManager
 import com.v2ray.ang.handler.SubscriptionUpdater
+import com.v2ray.ang.handler.TrafficStatsMonitor
 import com.v2ray.ang.helper.MessageHelper
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -43,6 +47,26 @@ class MainRepository(
     private val mainServiceEventChannel = Channel<MainServiceEvent>(Channel.UNLIMITED)
 
     override val mainServiceEvent: Flow<MainServiceEvent> = mainServiceEventChannel.receiveAsFlow()
+
+    // Live traffic snapshots arrive as broadcasts from the ":daemon" process;
+    // the in-process TrafficStatsMonitor singleton is never started here.
+    private val _trafficStats = MutableStateFlow(TrafficStatsMonitor.Snapshot())
+    override val trafficStats: StateFlow<TrafficStatsMonitor.Snapshot> = _trafficStats.asStateFlow()
+
+    private val trafficReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action != AppConfig.BROADCAST_ACTION_TRAFFIC_STATS) return
+            _trafficStats.value = TrafficStatsMonitor.Snapshot(
+                proxyUpSpeed = intent.getLongExtra("proxyUp", 0L),
+                proxyDownSpeed = intent.getLongExtra("proxyDown", 0L),
+                directUpSpeed = intent.getLongExtra("directUp", 0L),
+                directDownSpeed = intent.getLongExtra("directDown", 0L),
+                sessionUp = intent.getLongExtra("sessionUp", 0L),
+                sessionDown = intent.getLongExtra("sessionDown", 0L),
+                connectedAtMillis = intent.getLongExtra("connectedAt", 0L),
+            )
+        }
+    }
 
     private val serviceReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -87,6 +111,12 @@ class MainRepository(
             IntentFilter(AppConfig.BROADCAST_ACTION_ACTIVITY),
             Utils.receiverFlags()
         )
+        ContextCompat.registerReceiver(
+            app,
+            trafficReceiver,
+            IntentFilter(AppConfig.BROADCAST_ACTION_TRAFFIC_STATS),
+            Utils.receiverFlags()
+        )
         MessageHelper.sendMsg2Service(app, AppConfig.MSG_REGISTER_CLIENT, "")
     }
 
@@ -101,6 +131,11 @@ class MainRepository(
             app.unregisterReceiver(serviceReceiver)
         }.onFailure {
             LogUtil.e(AppConfig.TAG, "Failed to unregister main service receiver", it)
+        }
+        runCatching {
+            app.unregisterReceiver(trafficReceiver)
+        }.onFailure {
+            LogUtil.e(AppConfig.TAG, "Failed to unregister traffic receiver", it)
         }
         mainServiceEventChannel.close()
     }
