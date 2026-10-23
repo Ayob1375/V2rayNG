@@ -25,7 +25,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.v2ray.ang.dto.entities.ProfileItem
@@ -194,19 +193,9 @@ fun MainScreen(
                     }
                 )
             },
-            bottomBar = {
-                MainBottomBar(
-                    displayText = displayText,
-                    isRunning = isRunning,
-                    isDarkTheme = isDarkTheme,
-                    traffic = traffic,
-                    selectedPing = selectedPing,
-                    onAction = onAction
-                )
-            },
+            bottomBar = {},
             floatingActionButton = {},
         ) { innerPadding ->
-            val layoutDirection = LocalLayoutDirection.current
 
             if (groups.isNotEmpty()) {
                 Column(
@@ -214,6 +203,18 @@ fun MainScreen(
                         .fillMaxSize()
                         .padding(innerPadding)
                 ) {
+                    // Connection panel moved to the top (under the app bar):
+                    // visible at a glance without covering the server list,
+                    // and nothing overlaps the speed labels anymore.
+                    MainConnectionPanel(
+                        displayText = displayText,
+                        isRunning = isRunning,
+                        isDarkTheme = isDarkTheme,
+                        traffic = traffic,
+                        selectedPing = selectedPing,
+                        onAction = onAction
+                    )
+
                     if (groups.size > 1) {
                         GroupTabBar(
                             groups = groups,
@@ -264,7 +265,7 @@ fun MainScreen(
                                 start = 0.dp,
                                 top = 0.dp,
                                 end = 0.dp,
-                                bottom = 80.dp
+                                bottom = 12.dp
                             )
                         )
                     }
