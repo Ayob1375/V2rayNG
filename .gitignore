@@ -31,8 +31,9 @@ V2rayNG/app/libs
 # Exception: gradle wrapper jar must be committed (required by CI)
 !V2rayNG/gradle/wrapper/gradle-wrapper.jar
 
-# Ignore signing properties
+# Ignore signing properties (except our intentional CI signing config, see signing/README-FA.md)
 signing.properties
+!V2rayNG/app/signing.properties
 
 # Ignore shared object files
 *.so

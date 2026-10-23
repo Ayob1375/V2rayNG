@@ -5,6 +5,13 @@ plugins {
     id("com.jaredsburrows.license")
 }
 
+// --- Custom release signing (reads app/signing.properties if present) ---
+val signingPropsFile = file("signing.properties")
+val signingProps = java.util.Properties()
+if (signingPropsFile.exists()) {
+    signingPropsFile.inputStream().use { signingProps.load(it) }
+}
+
 android {
     namespace = "com.v2ray.ang"
     compileSdk = 37
@@ -38,6 +45,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    if (signingPropsFile.exists()) {
+        signingConfigs {
+            create("customRelease") {
+                storeFile = file(signingProps.getProperty("storeFile"))
+                storePassword = signingProps.getProperty("storePassword")
+                keyAlias = signingProps.getProperty("keyAlias")
+                keyPassword = signingProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -45,6 +63,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (signingPropsFile.exists()) {
+                signingConfig = signingConfigs.getByName("customRelease")
+            }
         }
     }
 

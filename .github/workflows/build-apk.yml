@@ -91,8 +91,7 @@ jobs:
         distribution: 'temurin'
         java-version: '21'
 
-    - name: Prepare signing keystore (secrets take priority, fallback to repo key)
-      id: ks
+    - name: Prepare signing (secrets take priority, fallback to committed signing.properties)
       env:
         KS_B64: ${{ secrets.APP_KEYSTORE_BASE64 }}
         KS_PASS_SEC: ${{ secrets.APP_KEYSTORE_PASSWORD }}
@@ -103,37 +102,40 @@ jobs:
         if [ -n "$KS_B64" ]; then
           echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/sign.keystore"
           {
-            echo "path=$RUNNER_TEMP/sign.keystore"
-            echo "pass=$KS_PASS_SEC"
-            echo "alias=$KS_ALIAS_SEC"
-            echo "keypass=$KEY_PASS_SEC"
-          } >> "$GITHUB_OUTPUT"
+            echo "storeFile=$RUNNER_TEMP/sign.keystore"
+            echo "storePassword=$KS_PASS_SEC"
+            echo "keyAlias=$KS_ALIAS_SEC"
+            echo "keyPassword=$KEY_PASS_SEC"
+          } > V2rayNG/app/signing.properties
           echo "Signing with: GitHub secrets keystore"
         else
-          cp "$GITHUB_WORKSPACE/signing/ayob1375-v2rayng.keystore" "$RUNNER_TEMP/sign.keystore"
-          {
-            echo "path=$RUNNER_TEMP/sign.keystore"
-            echo "pass=wK37KEHdOTXwbCcFH6iE"
-            echo "alias=v2rayng-custom"
-            echo "keypass=wK37KEHdOTXwbCcFH6iE"
-          } >> "$GITHUB_OUTPUT"
-          echo "Signing with: repo signing key (signing/ayob1375-v2rayng.keystore)"
+          echo "Signing with: committed signing.properties (repo signing key)"
         fi
 
-    - name: Build Release APK (signed)
+    - name: Build Release APK (signed via signing.properties)
       run: |
         cd ${{ github.workspace }}/V2rayNG
         echo "sdk.dir=${ANDROID_HOME}" > local.properties
         chmod 755 gradlew
-        ./gradlew assembleRelease \
-          -Pandroid.injected.signing.store.file=${{ steps.ks.outputs.path }} \
-          -Pandroid.injected.signing.store.password=${{ steps.ks.outputs.pass }} \
-          -Pandroid.injected.signing.key.alias=${{ steps.ks.outputs.alias }} \
-          -Pandroid.injected.signing.key.password=${{ steps.ks.outputs.keypass }}
+        ./gradlew assembleRelease --stacktrace
 
     - name: List APK outputs
       run: |
         find V2rayNG/app/build/outputs/apk -name '*.apk' -exec ls -la {} \;
+
+    - name: Verify APK signing (fail if unsigned)
+      run: |
+        python3 - <<'PY'
+        import glob, sys
+        apks = glob.glob('V2rayNG/app/build/outputs/apk/*/release/*.apk')
+        print(f'Found {len(apks)} release APKs')
+        any_signed = False
+        for apk in apks:
+            signed = b'APK Sig Block 42' in open(apk, 'rb').read()
+            print(('SIGNED  ' if signed else 'UNSIGNED') + ' - ' + apk)
+            any_signed = any_signed or signed
+        sys.exit(0 if (apks and any_signed) else 1)
+        PY
 
     - name: Upload arm64-v8a APK
       uses: actions/upload-artifact@v4
