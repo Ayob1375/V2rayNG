@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -7,7 +9,7 @@ plugins {
 
 // --- Custom release signing (reads app/signing.properties if present) ---
 val signingPropsFile = file("signing.properties")
-val signingProps = java.util.Properties()
+val signingProps = Properties()
 if (signingPropsFile.exists()) {
     signingPropsFile.inputStream().use { signingProps.load(it) }
 }
