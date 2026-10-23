@@ -61,8 +61,9 @@ import com.v2ray.ang.ui.compose.ItemDivider
 import com.v2ray.ang.ui.compose.ReorderableGridItem
 import com.v2ray.ang.ui.compose.ReorderableListItem
 import com.v2ray.ang.ui.compose.colorConfigType
-import com.v2ray.ang.ui.compose.colorPing
-import com.v2ray.ang.ui.compose.colorPingRed
+import com.v2ray.ang.ui.compose.colorPingBad
+import com.v2ray.ang.ui.compose.colorPingGood
+import com.v2ray.ang.ui.compose.colorPingWarn
 import com.v2ray.ang.ui.compose.verticalScrollbar
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyGridState
@@ -444,7 +445,7 @@ private fun ServerListItem(
                 )
             }
             Spacer(modifier = Modifier.height(6.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     row.typeDescription,
                     modifier = Modifier.weight(1f, fill = false),
@@ -454,13 +455,31 @@ private fun ServerListItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    testResult,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (row.testDelayMillis < 0L) colorPingRed else colorPing,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                if (testResult.isNotEmpty()) {
+                    val pingColor = when {
+                        row.testDelayMillis < 0L -> colorPingBad
+                        row.testDelayMillis < 200L -> colorPingGood
+                        row.testDelayMillis < 500L -> colorPingWarn
+                        else -> colorPingBad
+                    }
+                    // Quality badge: colored dot + delay text
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(pingColor)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            testResult,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = pingColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
         }
     }

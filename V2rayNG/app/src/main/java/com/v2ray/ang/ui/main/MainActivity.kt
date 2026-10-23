@@ -9,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.lifecycleScope
 import com.v2ray.ang.AngApplication
 import com.v2ray.ang.AppConfig
@@ -101,6 +102,16 @@ class MainActivity : HelperBaseComponentActivity() {
     @Composable
     override fun ScreenContent() {
         BackHandler { moveTaskToBack(false) }
+        // Smart connect (and other flows) may request the service to start.
+        LaunchedEffect(Unit) {
+            mainViewModel.serviceStartRequest.collect {
+                if (mainViewModel.uiState.value.isRunning) {
+                    LauncherManager.restartService(this@MainActivity)
+                } else {
+                    requestServiceStart()
+                }
+            }
+        }
         MainScreen(
             mainViewModel = mainViewModel,
             onAction = { action ->

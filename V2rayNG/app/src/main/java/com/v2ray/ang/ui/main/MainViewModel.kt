@@ -19,6 +19,7 @@ import com.v2ray.ang.extension.isComplexType
 import com.v2ray.ang.extension.matchesPattern
 import com.v2ray.ang.extension.moveItem
 import com.v2ray.ang.handler.SubscriptionInfoParser
+import com.v2ray.ang.handler.TrafficStatsMonitor
 import com.v2ray.ang.ui.base.BaseViewModel
 import com.v2ray.ang.util.LogUtil
 import kotlinx.coroutines.CancellationException
@@ -27,6 +28,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,6 +36,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -109,6 +112,15 @@ class MainViewModel(
 
     private val testRequests = MainTestRequests()
     private var bulkTestJob: Job? = null
+
+    // ---------- Smart connect ----------
+    @Volatile
+    private var smartConnectPending = false
+    private val _serviceStartRequest = Channel<Unit>(Channel.BUFFERED)
+    val serviceStartRequest = _serviceStartRequest.receiveAsFlow()
+
+    /** Live traffic/speed snapshots published by the core service. */
+    val trafficStats: StateFlow<TrafficStatsMonitor.Snapshot> = TrafficStatsMonitor.snapshot
 
     private val initialPageReady = CompletableDeferred<Unit>()
 
@@ -285,6 +297,8 @@ class MainViewModel(
             MainAction.RemoveInvalidServers -> removeInvalidServerAsync()
             MainAction.SortByTestResults -> sortByTestResultsAsync()
             MainAction.UpdateSubscriptions -> importConfigViaSub(uiState.value.selectedGroupId)
+            MainAction.UpdateAllSubscriptions -> importConfigViaSub("")
+            MainAction.SmartConnect -> smartConnect()
             is MainAction.UpdateGroupSubscription -> importConfigViaSub(action.groupId)
             MainAction.ExportAll -> exportAllAsync()
             is MainAction.SelectGroup -> subscriptionIdChanged(action.groupId)
@@ -822,6 +836,7 @@ class MainViewModel(
         testRequests.invalidateCurrent()
         cancelPendingTestResults()
         resetTestStatus()
+        smartConnectPending = false
         dataSource.cancelAllPing()
     }
 
@@ -904,6 +919,52 @@ class MainViewModel(
         viewModelScope.launch(ioDispatcher) {
             cacheMutex.withLock { groupDataCache.clear() }
             reloadAllGroups(_uiState.value.groups.map { it.id })
+            finishSmartConnectIfPending()
+        }
+    }
+
+    // ---------- Smart connect ----------
+    /**
+     * Picks the fastest tested server in the current group and connects to it.
+     * If no server has been tested yet, runs a full real-ping test first and
+     * connects automatically once results arrive.
+     */
+    private fun smartConnect() {
+        val servers = currentServers()
+        if (servers.isEmpty()) {
+            toastError(R.string.toast_smart_connect_no_server)
+            return
+        }
+        val best = servers.filter { it.testDelayMillis > 0L }.minByOrNull { it.testDelayMillis }
+        if (best != null) {
+            connectToServer(best.guid)
+        } else {
+            smartConnectPending = true
+            toast(R.string.toast_smart_connect_testing)
+            testAllRealPing()
+        }
+    }
+
+    private fun finishSmartConnectIfPending() {
+        if (!smartConnectPending) return
+        smartConnectPending = false
+        val best = currentServers().filter { it.testDelayMillis > 0L }.minByOrNull { it.testDelayMillis }
+        if (best != null) {
+            connectToServer(best.guid)
+        } else {
+            toastError(R.string.toast_smart_connect_failed)
+        }
+    }
+
+    private fun connectToServer(guid: String) {
+        val remarks = currentServers().firstOrNull { it.guid == guid }?.profile?.remarks
+        updateSelectedGuid(guid)
+        toastSuccess(
+            remarks?.let { dataSource.getString(R.string.toast_smart_connect_picked, it) }
+                ?: getString(R.string.toast_smart_connect_done)
+        )
+        viewModelScope.launch {
+            _serviceStartRequest.send(Unit)
         }
     }
 

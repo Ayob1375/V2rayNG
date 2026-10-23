@@ -50,6 +50,7 @@ import com.v2ray.ang.ui.compose.SettingsListItem
 import com.v2ray.ang.ui.compose.SettingsMenuItem
 import com.v2ray.ang.ui.compose.SettingsSwitchItem
 import com.v2ray.ang.ui.compose.ThemeManager
+import com.v2ray.ang.ui.compose.ThemeStylePicker
 import com.v2ray.ang.ui.compose.verticalScrollbar
 import com.v2ray.ang.util.LogUtil
 import com.v2ray.ang.util.Utils
@@ -105,6 +106,7 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
     val systemVpnSettingsAvailable by viewModel.systemVpnSettingsAvailable.collectAsStateWithLifecycle()
+    var themeSettingsExpanded by rememberSaveable { mutableStateOf(true) }
     var uiSettingsExpanded by rememberSaveable { mutableStateOf(true) }
     var vpnSettingsExpanded by rememberSaveable { mutableStateOf(true) }
     var coreSettingsExpanded by rememberSaveable { mutableStateOf(true) }
@@ -165,6 +167,7 @@ fun SettingsScreen(
     }
     var uiModeNight by rememberMmkvString(AppConfig.PREF_UI_MODE_NIGHT, "0")
     var dynamicColor by rememberMmkvBool(AppConfig.PREF_DYNAMIC_COLOR, true)
+    var themeStyle by rememberMmkvString(AppConfig.PREF_THEME_STYLE, "0")
 
     var ipv6Enabled by rememberMmkvBool(AppConfig.PREF_IPV6_ENABLED, false)
     var preferIpv6 by rememberMmkvBool(AppConfig.PREF_PREFER_IPV6, false)
@@ -235,6 +238,48 @@ fun SettingsScreen(
                 .verticalScrollbar(scrollState)
                 .verticalScroll(scrollState)
         ) {
+            // ---------- Theme section ----------
+            CollapsiblePreferenceGroupHeader(
+                title = stringResource(R.string.title_theme),
+                expanded = themeSettingsExpanded,
+                onExpandedChange = { themeSettingsExpanded = it }
+            )
+            if (themeSettingsExpanded) {
+                SettingsListItem(
+                    title = stringResource(R.string.title_pref_ui_mode_night),
+                    entries = uiModeNightEntries,
+                    values = uiModeNightValues,
+                    selectedValue = uiModeNight,
+                    onSelected = {
+                        uiModeNight = it
+                        ThemeManager.setThemeMode(it)
+                    }
+                )
+                SettingsSwitchItem(
+                    title = stringResource(R.string.title_pref_dynamic_color),
+                    summary = stringResource(R.string.summary_pref_dynamic_color),
+                    checked = dynamicColor,
+                    enabled = dynamicColorSupported,
+                    onCheckedChange = {
+                        dynamicColor = it
+                        ThemeManager.setDynamicColorEnabled(it)
+                    }
+                )
+                ThemeStylePicker(
+                    selectedStyle = themeStyle,
+                    onStyleSelected = { style ->
+                        themeStyle = style
+                        ThemeManager.setThemeStyle(style)
+                        // Palette styles are ignored while dynamic color is on;
+                        // turn it off automatically so the choice takes effect.
+                        if (dynamicColor && dynamicColorSupported) {
+                            dynamicColor = false
+                            ThemeManager.setDynamicColorEnabled(false)
+                        }
+                    }
+                )
+            }
+
             CollapsiblePreferenceGroupHeader(
                 title = stringResource(R.string.title_ui_settings),
                 expanded = uiSettingsExpanded,
@@ -271,16 +316,6 @@ fun SettingsScreen(
                         SettingsChangeManager.makeSetupGroupTab()
                     }
                 )
-                SettingsSwitchItem(
-                    title = stringResource(R.string.title_pref_dynamic_color),
-                    summary = stringResource(R.string.summary_pref_dynamic_color),
-                    checked = dynamicColor,
-                    enabled = dynamicColorSupported,
-                    onCheckedChange = {
-                        dynamicColor = it
-                        ThemeManager.setDynamicColorEnabled(it)
-                    }
-                )
                 SettingsListItem(
                     title = stringResource(R.string.title_language),
                     entries = languageEntries,
@@ -289,16 +324,6 @@ fun SettingsScreen(
                     onSelected = {
                         language = it
                         AppLocaleManager.setApplicationLanguage(it)
-                    }
-                )
-                SettingsListItem(
-                    title = stringResource(R.string.title_pref_ui_mode_night),
-                    entries = uiModeNightEntries,
-                    values = uiModeNightValues,
-                    selectedValue = uiModeNight,
-                    onSelected = {
-                        uiModeNight = it
-                        ThemeManager.setThemeMode(it)
                     }
                 )
             }

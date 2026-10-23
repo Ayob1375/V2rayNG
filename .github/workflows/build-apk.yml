@@ -1,0 +1,177 @@
+name: Build Custom APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional release tag (e.g. v2.3.13-custom1). Leave empty to only build artifacts.'
+        required: false
+        type: string
+  push:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.APP_KEYSTORE_BASE64 != '' }}
+
+    steps:
+    - name: Checkout code (no submodules needed)
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: '0'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        packages: 'platforms;android-37.0 build-tools;37.0.0 platform-tools'
+
+    - name: Install NDK
+      run: |
+        echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          --channel=0 \
+          --install "ndk;30.0.16248370"
+        echo "NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> $GITHUB_ENV
+        # Inject the NDK version into the app gradle file (after compileSdk line)
+        sed -i 's/^    compileSdk = 37$/    compileSdk = 37\n    ndkVersion = "30.0.16248370"/' ${{ github.workspace }}/V2rayNG/app/build.gradle.kts
+        grep -n "ndkVersion" ${{ github.workspace }}/V2rayNG/app/build.gradle.kts
+
+    - name: Restore cached libhevtun
+      id: cache-libhevtun-restore
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ github.workspace }}/libs
+        key: libhevtun-${{ runner.os }}-${{ env.NDK_HOME }}-${{ hashFiles('compile-hevtun.sh') }}
+
+    - name: Clone hev-socks5-tunnel sources
+      if: steps.cache-libhevtun-restore.outputs.cache-hit != 'true'
+      run: |
+        git clone --depth 1 --recursive https://github.com/heiher/hev-socks5-tunnel.git hev-socks5-tunnel
+
+    - name: Build libhevtun
+      if: steps.cache-libhevtun-restore.outputs.cache-hit != 'true'
+      run: |
+        bash compile-hevtun.sh
+
+    - name: Save libhevtun cache
+      if: steps.cache-libhevtun-restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ github.workspace }}/libs
+        key: libhevtun-${{ runner.os }}-${{ env.NDK_HOME }}-${{ hashFiles('compile-hevtun.sh') }}
+
+    - name: Copy libhevtun
+      run: |
+        cp -r ${{ github.workspace }}/libs ${{ github.workspace }}/V2rayNG/app
+
+    - name: Download latest libv2ray.aar (Xray core)
+      run: |
+        mkdir -p V2rayNG/app/libs/
+        TAG=$(curl -s https://api.github.com/repos/2dust/AndroidLibXrayLite/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
+        echo "Latest AndroidLibXrayLite tag: $TAG"
+        curl -L -o V2rayNG/app/libs/libv2ray.aar \
+          "https://github.com/2dust/AndroidLibXrayLite/releases/download/${TAG}/libv2ray.aar"
+        ls -la V2rayNG/app/libs/
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '21'
+
+    - name: Decode Keystore
+      if: env.HAS_KEYSTORE == 'true'
+      uses: timheuer/base64-to-file@v2.0.0
+      id: android_keystore
+      with:
+        fileName: "android_keystore.jks"
+        encodedString: ${{ secrets.APP_KEYSTORE_BASE64 }}
+
+    - name: Build Release APK (signed)
+      if: env.HAS_KEYSTORE == 'true'
+      run: |
+        cd ${{ github.workspace }}/V2rayNG
+        echo "sdk.dir=${ANDROID_HOME}" > local.properties
+        chmod 755 gradlew
+        ./gradlew assembleRelease \
+          -Pandroid.injected.signing.store.file=${{ steps.android_keystore.outputs.filePath }} \
+          -Pandroid.injected.signing.store.password=${{ secrets.APP_KEYSTORE_PASSWORD }} \
+          -Pandroid.injected.signing.key.alias=${{ secrets.APP_KEYSTORE_ALIAS }} \
+          -Pandroid.injected.signing.key.password=${{ secrets.APP_KEY_PASSWORD }}
+
+    - name: Build Debug APK (fallback when no keystore)
+      if: env.HAS_KEYSTORE != 'true'
+      run: |
+        cd ${{ github.workspace }}/V2rayNG
+        echo "sdk.dir=${ANDROID_HOME}" > local.properties
+        chmod 755 gradlew
+        ./gradlew assembleFdroidDebug
+
+    - name: Upload arm64-v8a APK
+      uses: actions/upload-artifact@v4
+      if: ${{ success() }}
+      with:
+        name: arm64-v8a
+        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/*/release/*arm64-v8a*.apk
+
+    - name: Upload armeabi-v7a APK
+      uses: actions/upload-artifact@v4
+      if: ${{ success() }}
+      with:
+        name: armeabi-v7a
+        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/*/release/*armeabi-v7a*.apk
+
+    - name: Upload x86 APKs
+      uses: actions/upload-artifact@v4
+      if: ${{ success() }}
+      with:
+        name: x86-apks
+        path: |
+          ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/*/release/*x86_64*.apk
+          ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/*/release/*x86*.apk
+
+    - name: Upload universal APK
+      uses: actions/upload-artifact@v4
+      if: ${{ success() }}
+      with:
+        name: universal-apk
+        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/*/release/*universal*.apk
+
+    - name: Upload debug APK (fallback)
+      uses: actions/upload-artifact@v4
+      if: env.HAS_KEYSTORE != 'true' && success()
+      with:
+        name: debug-apk
+        path: ${{ github.workspace }}/V2rayNG/app/build/outputs/apk/fdroid/debug/*.apk
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+
+    steps:
+      - name: Download APK artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+
+      - name: Collect APK files
+        run: |
+          mkdir -p release-files
+          find release -type f -name '*.apk' -exec cp {} release-files/ \;
+          ls -la release-files/
+
+      - name: Upload APKs to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          file: release-files/*
+          tag: ${{ inputs.release_tag }}
+          file_glob: true
+          overwrite: true
+          prerelease: true

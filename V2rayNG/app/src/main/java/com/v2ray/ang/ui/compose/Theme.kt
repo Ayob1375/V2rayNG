@@ -104,6 +104,9 @@ private val DarkColor = darkColorScheme(
 // Semantic Colors
 val colorPing = Color(0xFF009966) // Green
 val colorPingRed = Color(0xFFFF0099) // Pink Red
+val colorPingGood = Color(0xFF2E9E5B) // Green - fast server (< 200ms)
+val colorPingWarn = Color(0xFFF5A623) // Amber - medium server (200-500ms)
+val colorPingBad = Color(0xFFE53935) // Red - slow or unreachable server (> 500ms)
 val colorConfigType = Color(0xFFf97910) // Orange
 val colorFabActive = Color(0xFFf97910) // Orange
 val colorFabInactiveLight = Color(0xFF9C9C9C) // Gray
@@ -131,6 +134,11 @@ object ThemeManager {
     )
     val dynamicColorEnabled: StateFlow<Boolean> = _dynamicColorEnabled.asStateFlow()
 
+    private val _themeStyle = MutableStateFlow(
+        MmkvManager.decodeSettingsString(AppConfig.PREF_THEME_STYLE, "0") ?: "0"
+    )
+    val themeStyle: StateFlow<String> = _themeStyle.asStateFlow()
+
     fun setThemeMode(mode: String) {
         MmkvManager.encodeSettings(AppConfig.PREF_UI_MODE_NIGHT, mode)
         _themeMode.value = mode
@@ -141,11 +149,18 @@ object ThemeManager {
         _dynamicColorEnabled.value = enabled
     }
 
+    fun setThemeStyle(style: String) {
+        MmkvManager.encodeSettings(AppConfig.PREF_THEME_STYLE, style)
+        _themeStyle.value = style
+    }
+
     fun refresh() {
         _themeMode.value =
             MmkvManager.decodeSettingsString(AppConfig.PREF_UI_MODE_NIGHT, "0") ?: "0"
         _dynamicColorEnabled.value =
             MmkvManager.decodeSettingsBool(AppConfig.PREF_DYNAMIC_COLOR, true)
+        _themeStyle.value =
+            MmkvManager.decodeSettingsString(AppConfig.PREF_THEME_STYLE, "0") ?: "0"
     }
 }
 
@@ -167,14 +182,17 @@ fun AppTheme(
     content: @Composable () -> Unit
 ) {
     val dynamicColor by ThemeManager.dynamicColorEnabled.collectAsState()
+    val themeStyle by ThemeManager.themeStyle.collectAsState()
     val context = LocalContext.current
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
 
-        darkTheme -> DarkColor
-        else -> LightColor
+        else -> {
+            val palette = ThemePalette.fromId(themeStyle)
+            if (darkTheme) palette.dark else palette.light
+        }
     }
     val snackbarController = rememberAppSnackbarController()
 

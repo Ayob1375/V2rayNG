@@ -49,6 +49,14 @@ fun MainScreen(
     val doubleColumnDisplay = uiState.doubleColumnDisplay
     val confirmRemove = uiState.confirmRemove
     val shareQRCodeBitmap = uiState.shareQRCodeBitmap
+    val traffic by mainViewModel.trafficStats.collectAsStateWithLifecycle()
+
+    // Selected server's latest test delay for the status panel.
+    val selectedGroupState by remember(uiState.selectedGroupId) {
+        mainViewModel.serverGroupState(uiState.selectedGroupId)
+    }.collectAsStateWithLifecycle()
+    val selectedPing = selectedGroupState.rows
+        .firstOrNull { it.guid == selectedGuid }?.testDelayMillis
 
     val isDarkTheme = LocalDarkTheme.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -180,6 +188,8 @@ fun MainScreen(
                             MainMoreMenuAction.TestAll -> onAction(MainAction.TestAllServers)
                             MainMoreMenuAction.TestAllRealPing -> onAction(MainAction.TestRealAllServers)
                             MainMoreMenuAction.UpdateSubscriptions -> onAction(MainAction.UpdateSubscriptions)
+                            MainMoreMenuAction.UpdateAllSubscriptions -> onAction(MainAction.UpdateAllSubscriptions)
+                            MainMoreMenuAction.SmartConnect -> onAction(MainAction.SmartConnect)
                         }
                     }
                 )
@@ -189,6 +199,8 @@ fun MainScreen(
                     displayText = displayText,
                     isRunning = isRunning,
                     isDarkTheme = isDarkTheme,
+                    traffic = traffic,
+                    selectedPing = selectedPing,
                     onAction = onAction
                 )
             },

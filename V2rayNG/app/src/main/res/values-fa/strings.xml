@@ -564,4 +564,24 @@
     <string name="sub_info_open_page">باز کردن صفحه اطلاعات اشتراک</string>
     <string name="sub_info_unlimited">نامحدود</string>
 
+    <string name="title_sub_update_all">به‌روزرسانی همه اشتراک‌ها</string>
+    <string name="menu_item_smart_connect">اتصال هوشمند (سریع‌ترین سرور)</string>
+    <string name="acc_smart_connect">اتصال هوشمند به سریع‌ترین سرور</string>
+    <string name="toast_smart_connect_testing">در حال تست سرورها؛ به‌زودی به سریع‌ترین متصل می‌شود…</string>
+    <string name="toast_smart_connect_failed">اتصال هوشمند ناموفق بود: هیچ سرور قابل دسترسی نیست</string>
+    <string name="toast_smart_connect_no_server">سروری برای اتصال وجود ندارد</string>
+    <string name="toast_smart_connect_picked">سریع‌ترین سرور انتخاب شد: %1$s</string>
+    <string name="toast_smart_connect_done">سریع‌ترین سرور انتخاب شد</string>
+    <string name="title_theme">تم</string>
+    <string name="title_theme_style">سبک تم</string>
+    <string name="summary_theme_style">انتخاب پالت رنگی (وقتی رنگ پویا خاموش باشد اعمال می‌شود)</string>
+    <string name="theme_style_default">پیش‌فرض</string>
+    <string name="theme_style_ocean">اقیانوسی</string>
+    <string name="theme_style_neon">بنفش نئون</string>
+    <string name="theme_style_emerald">زمردی</string>
+    <string name="theme_style_sunset">غروب</string>
+    <string name="theme_style_rose">رز</string>
+    <string name="connection_panel_uptime">%1$s</string>
+    <string name="connection_panel_session">مصرف جلسه: %1$s</string>
+
 </resources>
