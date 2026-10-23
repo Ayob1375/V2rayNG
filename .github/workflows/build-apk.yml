@@ -23,13 +23,15 @@ jobs:
 
     steps:
     - name: Checkout code (no submodules needed)
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: '0'
 
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
       with:
+        log-accepted-android-sdk-licenses: false
+        cmdline-tools-version: '14742923'
         packages: 'platforms;android-37.0 build-tools;37.0.0 platform-tools'
 
     - name: Install NDK
@@ -38,13 +40,13 @@ jobs:
           --channel=0 \
           --install "ndk;30.0.16248370"
         echo "NDK_HOME=$ANDROID_HOME/ndk/30.0.16248370" >> $GITHUB_ENV
-        # Inject the NDK version into the app gradle file (after compileSdk line)
+        # Inject the NDK version into the app gradle file (anchored after compileSdk)
         sed -i 's/^    compileSdk = 37$/    compileSdk = 37\n    ndkVersion = "30.0.16248370"/' ${{ github.workspace }}/V2rayNG/app/build.gradle.kts
         grep -n "ndkVersion" ${{ github.workspace }}/V2rayNG/app/build.gradle.kts
 
     - name: Restore cached libhevtun
       id: cache-libhevtun-restore
-      uses: actions/cache/restore@v4
+      uses: actions/cache/restore@v6
       with:
         path: ${{ github.workspace }}/libs
         key: libhevtun-${{ runner.os }}-${{ env.NDK_HOME }}-${{ hashFiles('compile-hevtun.sh') }}
@@ -61,7 +63,7 @@ jobs:
 
     - name: Save libhevtun cache
       if: steps.cache-libhevtun-restore.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
+      uses: actions/cache/save@v6
       with:
         path: ${{ github.workspace }}/libs
         key: libhevtun-${{ runner.os }}-${{ env.NDK_HOME }}-${{ hashFiles('compile-hevtun.sh') }}
@@ -70,14 +72,18 @@ jobs:
       run: |
         cp -r ${{ github.workspace }}/libs ${{ github.workspace }}/V2rayNG/app
 
-    - name: Download latest libv2ray.aar (Xray core)
+    - name: Download libv2ray.aar (pinned to the submodule version)
+      uses: robinraju/release-downloader@v1.13
+      with:
+        repository: '2dust/AndroidLibXrayLite'
+        tag: 'v26.10.21'
+        fileName: 'libv2ray.aar'
+        out-file-path: 'V2rayNG/app/libs'
+
+    - name: Verify libs
       run: |
-        mkdir -p V2rayNG/app/libs/
-        TAG=$(curl -s https://api.github.com/repos/2dust/AndroidLibXrayLite/releases/latest | grep -o '"tag_name": *"[^"]*"' | cut -d'"' -f4)
-        echo "Latest AndroidLibXrayLite tag: $TAG"
-        curl -L -o V2rayNG/app/libs/libv2ray.aar \
-          "https://github.com/2dust/AndroidLibXrayLite/releases/download/${TAG}/libv2ray.aar"
         ls -la V2rayNG/app/libs/
+        test -f V2rayNG/app/libs/libv2ray.aar
 
     - name: Setup Java
       uses: actions/setup-java@v4

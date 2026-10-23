@@ -46,21 +46,24 @@
 1. وارد گیت‌هاب شوید و یک ریپوی **عمومی (Public)** به نام `V2rayNG` بسازید (اگر از قبل ساخته‌اید، خالی‌اش کنید یا اسم دیگری بدهید).
 2. **نکته مهم:** نیازی به زیرماژول‌ها نیست — workflow جدید همه چیز را خودش در CI دانلود و کامپایل می‌کند.
 
-### مرحله ۲ — آپلود کد
-کدها را از این بسته (پوشه `v2rayNG`) به ریپو پوش کنید:
+### مرحله ۲ — آپلود کد (با کلید SSH)
+کدها آماده پوش هستند. فقط کافی است کلید عمومی زیر را به اکانت گیت‌هاب Ayob1375 اضافه کنید:
 
-```bash
-# بعد از باز کردن بسته zip:
-cd v2rayNG
-git init
-git checkout -b master
-git add -A
-git commit -m "v2rayNG Custom c1: themes, smart connect, live speed, ping badges, CI"
-git remote add origin https://github.com/Ayob1375/V2rayNG.git
-git push -f origin master
+```
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPHoHh7bpiQj6uEPj5P7JzMCE1jlD9NRJ84Idj4nRiZ Ayob1375-v2rayNG-build@zai
 ```
 
-> اگر از Token استفاده می‌کنید: `git remote add origin https://Ayob1375@github.com/Ayob1375/V2rayNG.git` و در مرحله push، رمز Token را وارد کنید.
+مسیر اضافه کردن کلید:
+**GitHub ← Settings (اکانت) ← SSH and GPG keys ← New SSH key ← کلید بالا را Paste کنید ← Add SSH key**
+
+بعد از اضافه کردن کلید، پوش به این شکل انجام می‌شود:
+
+```bash
+git push -f ayob master
+```
+
+> اگر به جای کلید SSH ترجیح می‌دهید از Token استفاده کنید:
+> `git remote set-url ayob https://Ayob1375:<TOKEN>@github.com/Ayob1375/V2rayNG.git` و سپس `git push -f ayob master`
 
 ### مرحله ۳ — ساخت keystore امضا (یک بار برای همیشه)
 
