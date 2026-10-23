@@ -50,11 +50,13 @@
 کدها آماده پوش هستند. فقط کافی است کلید عمومی زیر را به اکانت گیت‌هاب Ayob1375 اضافه کنید:
 
 ```
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPHoHh7bpiQj6uEPj5P7JzMCE1jlD9NRJ84Idj4nRiZ Ayob1375-v2rayNG-build@zai
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIL3/tH3RjEe8g9WllNhQ0oEpXAArQYkn50aLzhpamhSw Ayob1375-v2rayNG-build@zai
 ```
 
 مسیر اضافه کردن کلید:
-**GitHub ← Settings (اکانت) ← SSH and GPG keys ← New SSH key ← کلید بالا را Paste کنید ← Add SSH key**
+**GitHub ← Settings (اکانت) ← SSH and GPG keys ← New SSH key ← نوع: Authentication Key ← کلید بالا را Paste کنید ← Add SSH key**
+
+> فینگرپرینت صحیح کلید: `SHA256:JN+imm61wb4EAJEfB+M+B1K9yuUcz/2Sg7TDJCmFYhY` — بعد از افزودن، در لیست کلیدها همین باید نمایش داده شود.
 
 بعد از اضافه کردن کلید، پوش به این شکل انجام می‌شود:
 
